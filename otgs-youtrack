@@ -1,0 +1,81 @@
+#!/usr/bin/env php
+<?php
+/**
+ * @author OnTheGo Systems
+ */
+
+namespace OTGS;
+
+$vendor_locations = array(
+	dirname( __DIR__ . '/../vendor/autoload.php' ),
+	dirname( getcwd() . '/vendor/autoload.php' ),
+	dirname( __DIR__ . '/../../../autoload.php' ),
+);
+
+$autoloader = '';
+foreach ( $vendor_locations as $vendor_location ) {
+	$autoload_file = $vendor_location . '/autoload.php';
+	if ( is_file( $autoload_file ) ) {
+		$autoloader = $autoload_file;
+		require_once $autoloader;
+		break;
+	}
+}
+if ( ! $autoloader ) {
+	throw new \LogicException(
+		'Could not locate autoload.php. Did you forget to install vendors using "composer install"?'
+	);
+}
+
+use OTGS\FileSystem;
+use OTGS\YouTrack\TicketsResolutionCommand;
+use Symfony\Component\Console\Application;
+use Symfony\Component\Console\ConsoleEvents;
+use Symfony\Component\Console\Event\ConsoleErrorEvent;
+use Symfony\Component\Console\Event\ConsoleEvent;
+use Symfony\Component\Console\Event\ConsoleTerminateEvent;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+
+
+$dispatcher = new EventDispatcher();
+
+$dispatcher->addListener(
+	ConsoleEvents::COMMAND,
+	function ( ConsoleEvent $event ) {
+		$output  = $event->getOutput();
+		$command = $event->getCommand();
+
+		$output->writeln( sprintf( 'Running <info>%s</info> command', $command->getName() ) );
+	}
+);
+
+$dispatcher->addListener(
+	ConsoleEvents::ERROR,
+	function ( ConsoleErrorEvent $event ) {
+		$output = $event->getOutput();
+
+		$command = $event->getCommand();
+
+		$output->writeln( sprintf( 'Oops, exception thrown while running <info>%s</info> command', $command->getName() ) );
+
+		// change the exception to another one
+		$event->setError( $event->getError() );
+	}
+);
+
+$dispatcher->addListener( ConsoleEvents::TERMINATE, function ( ConsoleTerminateEvent $event ) {
+	$output  = $event->getOutput();
+	$command = $event->getCommand();
+	$output->writeln( PHP_EOL . sprintf( 'Command <info>%s</info> completed.', $command->getName() ) );
+} );
+
+$application = new Application();
+
+$stream = new FileSystem();
+
+$ticketsResolution = new TicketsResolutionCommand( $stream );
+
+$application->add( $ticketsResolution );
+
+$application->setDispatcher( $dispatcher );
+$application->run();

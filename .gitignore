@@ -1,0 +1,7 @@
+# Created by .ignore support plugin (hsz.mobi)
+composer.phar
+/vendor/
+composer.lock
+/.idea/
+*.iml
+/temp/
